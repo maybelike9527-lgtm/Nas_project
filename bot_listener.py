@@ -233,9 +233,12 @@ def handle_updates():
                     os.system(f"python3 {os.path.join(BASE_PATH, 'check_bt.py')} &")
                     send_with_keyboard(chat_id, "🔍 正在掃描大檔案...")
                 elif "整理檔案" in msg_text:
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'fix_filenames.py')} &")
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'move_files.py')} &")
-                    send_with_keyboard(chat_id, "🚚 正在整理檔案...")
+                    fix_path = os.path.join(BASE_PATH, 'fix_filenames.py')
+                    move_path = os.path.join(BASE_PATH, 'move_files.py')
+                    # 使用 && 確保順序，並在最後加上 & 讓整個流程在背景跑
+                    cmd = f"python3 {fix_path} && python3 {move_path} &"
+                    os.system(cmd)
+                    send_with_keyboard(chat_id, "🚚 正在依序執行：修正檔名 ➔ 搬移檔案...")
                 elif "清理空間" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
                     send_with_keyboard(chat_id, "🧹 正在執行清理...")
@@ -251,3 +254,4 @@ if __name__ == "__main__":
     else:
 
         logger.critical("初始化中止：找不到 tele_token")
+
