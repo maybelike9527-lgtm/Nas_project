@@ -108,44 +108,111 @@ def handle_updates():
                 chat_id = str(msg["chat"]["id"])
                 msg_text = msg.get("text", "").strip()
 
-                # --- 庫存管理併發鎖定邏輯 ---
+                # --- 1. 優先處理「返回/取消」指令 (重置狀態) ---
+                if msg_text in ["回主選單", "取消"]:
+                    set_system_lock('accounting', None, 0)
+                    user_state.pop(chat_id, None)
+                    send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
+                    continue
+
+                # --- 2. 核心功能按鈕 (不受 state 影響) ---
+                if msg_text == "查股價":
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} &")
+                    send_with_keyboard(chat_id, "📈 收到指令：正在抓取最新行情回報...")
+                    continue
+
                 if msg_text == "庫存管理":
                     is_locked, locker_id, _ = check_system_lock('accounting')
                     if is_locked == 1 and str(locker_id) != chat_id:
                         logger.info(f"使用者 {chat_id} 嘗試進入，但目前由 {locker_id} 使用中")
                         send_with_keyboard(chat_id, "⚠️ <b>有人正在管理中請稍等</b>\n請待前一位使用者完成後再試。")
                         continue
-                    
+
                     set_system_lock('accounting', chat_id, 1)
                     manage_kb = {"keyboard": [["新增庫存", "刪除庫存"], ["查看庫存", "回主選單"]], "resize_keyboard": True}
                     send_with_keyboard(chat_id, "📊 <b>庫存與成本管理</b>\n請選擇操作：", manage_kb)
+                    continue
 
-                elif msg_text == "回主選單":
-                    set_system_lock('accounting', None, 0)
-                    send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
+                if msg_text == "查看庫存":
+                    try:
+                        conn = sqlite3.connect(DB_PATH)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT stock_code, shares, cost_price FROM stock_assets WHERE user_id = ?", (chat_id,))
+                        rows = cursor.fetchall()
+                        conn.close()
+                        if not rows:
+                            send_with_keyboard(chat_id, "📋 目前尚無庫存資料。")
+                        else:
+                            report = "📋 <b>您的持股庫存清單：</b>\n━━━━━━━━━━━━━━"
+                            for code, shares, cost in rows:
+                                report += f"\n代號：<code>{code}</code>\n持股：{shares} | 成本：{cost}\n"
+                            send_with_keyboard(chat_id, report)
+                    except Exception as e:
+                        logger.error(f"查看庫存失敗: {e}")
+                        send_with_keyboard(chat_id, "❌ 讀取資料庫失敗。")
+                    continue
 
-                elif msg_text == "新增庫存":
+                if msg_text == "新增庫存":
                     send_with_keyboard(chat_id, "📝 請輸入：<code>股票代號 股數 成本</code>\n例如：<code>2330 1000 650.5</code>", {"keyboard": [["回主選單"]]})
                     user_state[chat_id] = "WAIT_STOCK_ADD"
+                    continue
 
-                # --- 處理輸入邏輯 (以新增為例) ---
-                elif chat_id in user_state and user_state[chat_id] == "WAIT_STOCK_ADD":
-                    try:
-                        code, shares, cost = msg_text.split()
-                        conn = sqlite3.connect(DB_PATH)
-                        conn.execute("INSERT OR REPLACE INTO stock_assets (user_id, stock_code, shares, cost_price) VALUES (?, ?, ?, ?)",
-                                     (chat_id, code, int(shares), float(cost)))
-                        conn.commit()
-                        conn.close()
-                        logger.info(f"使用者 {chat_id} 更新庫存: {code}")
-                        send_with_keyboard(chat_id, f"✅ 已紀錄 <b>{code}</b>\n股數：{shares}\n成本：{cost}")
-                    except:
-                        send_with_keyboard(chat_id, "❌ 格式錯誤，請重新輸入。")
+                if msg_text == "刪除庫存":
+                    send_with_keyboard(chat_id, "🗑️ 請輸入要刪除的<b>股票代號</b>：", {"keyboard": [["回主選單"]]})
+                    user_state[chat_id] = "WAIT_STOCK_DEL"
+                    continue
 
-                # --- 其他原本的功能 ---
-                elif "查股價" in msg_text:
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} &")
-                    send_with_keyboard(chat_id, "📈 正在抓取行情...")
+                # --- 3. 處理需要狀態(State)的輸入邏輯 ---
+                if chat_id in user_state:
+                    state = user_state[chat_id]
+                    
+                    # 處理新增
+                    if state == "WAIT_STOCK_ADD":
+                        try:
+                            parts = msg_text.split()
+                            if len(parts) != 3: raise ValueError
+                            code, shares, cost = parts
+                            conn = sqlite3.connect(DB_PATH)
+                            conn.execute("INSERT OR REPLACE INTO stock_assets (user_id, stock_code, shares, cost_price) VALUES (?, ?, ?, ?)",
+                                         (chat_id, code, int(shares), float(cost)))
+                            conn.commit()
+                            conn.close()
+                            logger.info(f"使用者 {chat_id} 更新庫存: {code}")
+                            send_with_keyboard(chat_id, f"✅ 已紀錄 <b>{code}</b>\n股數：{shares}\n成本：{cost}")
+                            user_state.pop(chat_id)
+                        except:
+                            send_with_keyboard(chat_id, "❌ 格式錯誤，請重新輸入：\n<code>代號 股數 成本</code>")
+                    
+                    # 處理刪除
+                    elif state == "WAIT_STOCK_DEL":
+                        try:
+                            conn = sqlite3.connect(DB_PATH)
+                            cursor = conn.cursor()
+                            cursor.execute("DELETE FROM stock_assets WHERE user_id = ? AND stock_code = ?", (chat_id, msg_text))
+                            if cursor.rowcount > 0:
+                                conn.commit()
+                                logger.info(f"使用者 {chat_id} 刪除庫存: {msg_text}")
+                                send_with_keyboard(chat_id, f"✅ 已成功刪除 <b>{msg_text}</b>")
+                                user_state.pop(chat_id)
+                            else:
+                                send_with_keyboard(chat_id, f"❓ 找不到代號 <b>{msg_text}</b> 的資料。")
+                            conn.close()
+                        except Exception as e:
+                            logger.error(f"刪除失敗: {e}")
+                            send_with_keyboard(chat_id, "❌ 執行刪除時發生錯誤。")
+                    continue
+
+                # --- 4. 其他指令 (掃描BT、整理、清理) ---
+                if "掃描BT" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'check_bt.py')} &")
+                    send_with_keyboard(chat_id, "🔍 正在掃描大檔案...")
+                elif "整理檔案" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'fix_filenames.py')} &")
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'move_files.py')} &")
+                    send_with_keyboard(chat_id, "🚚 正在整理檔案...")
+                elif "清理空間" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
+                    send_with_keyboard(chat_id, "🧹 正在執行清理...")
 
         except Exception as e:
             logger.error(f"監聽異常: {e}")
@@ -154,3 +221,4 @@ def handle_updates():
 if __name__ == "__main__":
     if TOKEN: handle_updates()
     else: logger.critical("初始化中止：找不到 tele_token")
+
