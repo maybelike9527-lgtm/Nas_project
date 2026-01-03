@@ -7,6 +7,7 @@ import io
 import json
 import sqlite3
 import logging
+import subprocess
 from datetime import datetime, timedelta
 
 # ================= 📝 LOGGING 系統設定 (中文化) =================
@@ -96,10 +97,10 @@ def send_with_keyboard(chat_id, text, custom_keyboard=None):
 def handle_updates():
     offset = None
     user_state = {}
-    
+
     # 定義核心功能指令清單，用於偵測並自動解除鎖定
     CORE_COMMANDS = ["查股價", "掃描BT", "整理檔案", "清理空間", "全部執行"]
-    
+
     logger.info("機器人監聽服務已啟動")
 
     while True:
@@ -136,8 +137,13 @@ def handle_updates():
 
                 # --- 3. 核心功能按鈕處理 ---
                 if msg_text == "查股價":
-                    # 增加 manual 參數，確保假日主動查詢也能報價
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} manual &")
+                    # [修改前] 舊寫法 (容易掉參數)
+                    # os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} manual &")
+
+                    # [修改後] 新寫法 (穩定傳遞 manual 參數，且不阻塞主程式)
+                    script_path = os.path.join(BASE_PATH, 'stock_monitor_nas.py')
+                    subprocess.Popen([sys.executable, script_path, "manual"])
+
                     send_with_keyboard(chat_id, "📈 收到指令：正在抓取最新行情回報...")
                     continue
 
@@ -252,6 +258,4 @@ if __name__ == "__main__":
     if TOKEN:
         handle_updates()
     else:
-
         logger.critical("初始化中止：找不到 tele_token")
-
