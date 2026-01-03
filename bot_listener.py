@@ -96,6 +96,10 @@ def send_with_keyboard(chat_id, text, custom_keyboard=None):
 def handle_updates():
     offset = None
     user_state = {}
+    
+    # 定義核心功能指令清單，用於偵測並自動解除鎖定
+    CORE_COMMANDS = ["查股價", "掃描BT", "整理檔案", "清理空間", "全部執行"]
+    
     logger.info("機器人監聽服務已啟動")
 
     while True:
@@ -114,16 +118,25 @@ def handle_updates():
                 chat_id = str(msg["chat"]["id"])
                 msg_text = msg.get("text", "").strip()
 
-                # --- 1. 優先處理「返回/取消」指令 (重置狀態) ---
+                # --- 1. 自動解鎖邏輯：若鎖定者執行其他核心指令，則自動解鎖 ---
+                if msg_text in CORE_COMMANDS:
+                    is_locked, locker_id, _ = check_system_lock('accounting')
+                    if is_locked == 1 and str(locker_id) == chat_id:
+                        logger.info(f"使用者 {chat_id} 執行 {msg_text}，系統自動解除記帳鎖定")
+                        set_system_lock('accounting', None, 0)
+                        user_state.pop(chat_id, None)
+                    # 註：此處不 continue，讓下方對應的指令邏輯繼續執行
+
+                # --- 2. 優先處理「返回/取消」指令 (手動重置狀態) ---
                 if msg_text in ["回主選單", "取消"]:
                     set_system_lock('accounting', None, 0)
                     user_state.pop(chat_id, None)
                     send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
                     continue
 
-                # --- 2. 核心功能按鈕 (不受 state 影響) ---
+                # --- 3. 核心功能按鈕處理 ---
                 if msg_text == "查股價":
-                    # 增加 manual 參數，告訴腳本這是主動查詢
+                    # 增加 manual 參數，確保假日主動查詢也能報價
                     os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} manual &")
                     send_with_keyboard(chat_id, "📈 收到指令：正在抓取最新行情回報...")
                     continue
@@ -163,7 +176,7 @@ def handle_updates():
 
                 if msg_text == "新增庫存":
                     send_with_keyboard(chat_id,
-                                       "📝 請輸入：<code>股票代號 股數 成本</code>\n例如：<code>2330 1000 650.5</code>",
+                                       "📝 請輸入：<code>代號 股數 成本</code>\n例如：<code>2330 1000 650.5</code>",
                                        {"keyboard": [["回主選單"]]})
                     user_state[chat_id] = "WAIT_STOCK_ADD"
                     continue
@@ -173,7 +186,7 @@ def handle_updates():
                     user_state[chat_id] = "WAIT_STOCK_DEL"
                     continue
 
-                # --- 3. 處理需要狀態(State)的輸入邏輯 ---
+                # --- 4. 處理需要狀態 (State) 的輸入邏輯 ---
                 if chat_id in user_state:
                     state = user_state[chat_id]
 
@@ -215,7 +228,7 @@ def handle_updates():
                             send_with_keyboard(chat_id, "❌ 執行刪除時發生錯誤。")
                     continue
 
-                # --- 4. 其他指令 (掃描BT、整理、清理) ---
+                # --- 5. 其他 NAS 功能指令 ---
                 if "掃描BT" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'check_bt.py')} &")
                     send_with_keyboard(chat_id, "🔍 正在掃描大檔案...")
@@ -236,4 +249,5 @@ if __name__ == "__main__":
     if TOKEN:
         handle_updates()
     else:
+
         logger.critical("初始化中止：找不到 tele_token")
