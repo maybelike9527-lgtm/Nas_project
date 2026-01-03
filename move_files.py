@@ -19,8 +19,16 @@ logger = logging.getLogger(__name__)
 # ================= 🔤 環境初始化 =================
 # 強制輸出使用 UTF-8，解決 NAS Log 亂碼
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-# 關閉 SSL 安全警告
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# 關閉 SSL 安全警告 (加入相容性保護)
+try:
+    if hasattr(urllib3, 'disable_warnings'):
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    else:
+        # 針對部分舊版環境的替代方案
+        import requests.packages.urllib3 as urllib3_internal
+        urllib3_internal.disable_warnings(urllib3_internal.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 # 資料庫路徑
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "account_book.db")
