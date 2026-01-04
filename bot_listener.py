@@ -80,11 +80,12 @@ TOKEN = get_config('tele_token')
 
 def send_with_keyboard(chat_id, text, custom_keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    # [修改] 主選單將「查港口風力」改為「氣象查詢」
     default_keyboard = {
         "keyboard": [
             ["查股價", "掃描BT"],
             ["整理檔案", "清理空間"],
-            ["庫存管理", "查港口風力"],  # 新增按鈕
+            ["庫存管理", "氣象查詢"],
             ["全部執行", "回主選單"]
         ],
         "resize_keyboard": True
@@ -99,8 +100,8 @@ def handle_updates():
     offset = None
     user_state = {}
 
-    # 定義核心功能指令清單，用於偵測並自動解除鎖定
-    CORE_COMMANDS = ["查股價", "掃描BT", "整理檔案", "清理空間", "全部執行"]
+    # 定義核心功能指令清單 (加入新指令以支援自動解鎖)
+    CORE_COMMANDS = ["查股價", "掃描BT", "整理檔案", "清理空間", "全部執行", "氣象查詢", "查詢氣象", "港口風力"]
 
     logger.info("機器人監聽服務已啟動")
 
@@ -120,33 +121,42 @@ def handle_updates():
                 chat_id = str(msg["chat"]["id"])
                 msg_text = msg.get("text", "").strip()
 
-                # --- 0. 新增：處理 /start 指令 ---
+                # --- 0. 處理 /start 指令 ---
                 if msg_text == "/start":
                     send_with_keyboard(chat_id, "👋 歡迎使用 NAS 助理機器人！\n請選擇下方功能按鈕開始操作：")
                     continue
 
-                # --- 1. 自動解鎖邏輯：若鎖定者執行其他核心指令，則自動解鎖 ---
+                # --- 1. 自動解鎖邏輯 ---
                 if msg_text in CORE_COMMANDS:
                     is_locked, locker_id, _ = check_system_lock('accounting')
                     if is_locked == 1 and str(locker_id) == chat_id:
                         logger.info(f"使用者 {chat_id} 執行 {msg_text}，系統自動解除記帳鎖定")
                         set_system_lock('accounting', None, 0)
                         user_state.pop(chat_id, None)
-                    # 註：此處不 continue，讓下方對應的指令邏輯繼續執行
 
-                # --- 2. 優先處理「返回/取消」指令 (手動重置狀態) ---
+                # --- 2. 處理「返回/取消」指令 ---
                 if msg_text in ["回主選單", "取消"]:
                     set_system_lock('accounting', None, 0)
                     user_state.pop(chat_id, None)
                     send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
                     continue
 
-                # --- 3. 核心功能按鈕處理 ---
+                # --- 3. [新增] 氣象查詢層級選單 ---
+                if msg_text == "氣象查詢":
+                    weather_kb = {
+                        "keyboard": [
+                            ["查詢氣象", "港口風力"],
+                            ["回主選單"]
+                        ],
+                        "resize_keyboard": True
+                    }
+                    send_with_keyboard(chat_id, "🌤️ <b>氣象與風力查詢</b>\n請選擇您要查詢的項目：", weather_kb)
+                    continue
+
+                # --- 4. 核心功能按鈕處理 ---
                 if msg_text == "查股價":
-                    # [新寫法] 穩定傳遞 manual 參數，且不阻塞主程式
                     script_path = os.path.join(BASE_PATH, 'stock_monitor_nas.py')
                     subprocess.Popen([sys.executable, script_path, "manual"])
-
                     send_with_keyboard(chat_id, "📈 收到指令：正在抓取最新行情回報...")
                     continue
 
@@ -195,11 +205,10 @@ def handle_updates():
                     user_state[chat_id] = "WAIT_STOCK_DEL"
                     continue
 
-                # --- 4. 處理需要狀態 (State) 的輸入邏輯 ---
+                # --- 5. 處理狀態 (State) 輸入邏輯 ---
                 if chat_id in user_state:
                     state = user_state[chat_id]
 
-                    # 處理新增
                     if state == "WAIT_STOCK_ADD":
                         try:
                             parts = msg_text.split()
@@ -217,7 +226,6 @@ def handle_updates():
                         except:
                             send_with_keyboard(chat_id, "❌ 格式錯誤，請重新輸入：\n<code>代號 股數 成本</code>")
 
-                    # 處理刪除
                     elif state == "WAIT_STOCK_DEL":
                         try:
                             conn = sqlite3.connect(DB_PATH)
@@ -237,22 +245,25 @@ def handle_updates():
                             send_with_keyboard(chat_id, "❌ 執行刪除時發生錯誤。")
                     continue
 
-                # --- 5. 其他 NAS 功能指令 ---
+                # --- 6. 其他 NAS 功能指令 ---
                 if "掃描BT" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'check_bt.py')} &")
                     send_with_keyboard(chat_id, "🔍 正在掃描大檔案...")
                 elif "整理檔案" in msg_text:
                     fix_path = os.path.join(BASE_PATH, 'fix_filenames.py')
                     move_path = os.path.join(BASE_PATH, 'move_files.py')
-                    # 使用 && 確保順序，並在最後加上 & 讓整個流程在背景跑
                     cmd = f"python3 {fix_path} ; python3 {move_path} &"
                     os.system(cmd)
                     send_with_keyboard(chat_id, "🚚 正在依序執行：修正檔名 ➔ 搬移檔案...")
                 elif "清理空間" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
                     send_with_keyboard(chat_id, "🧹 正在執行清理...")
-                elif "查港口風力" in msg_text:
-                    # 執行新的風力監測腳本
+
+                # [修改] 處理新的子選單指令
+                elif "查詢氣象" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'disaster_monitor.py')} &")
+                    send_with_keyboard(chat_id, "🌤️ 正在獲取最新氣象預報...")
+                elif "港口風力" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'marine_monitor.py')} &")
                     send_with_keyboard(chat_id, "⚓ 正在連線氣象署讀取台中港區風力...")
 
