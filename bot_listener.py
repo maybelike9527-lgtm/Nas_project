@@ -258,6 +258,17 @@ def handle_updates():
                 elif "清理空間" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
                     send_with_keyboard(chat_id, "🧹 正在執行清理...")
+                elif msg_text.startswith("https://cn.javd.me/movie/"):
+                    send_with_keyboard(chat_id, "🔍 偵測到 JAVD 連結，正在解析並加入下載任務...")
+
+                    # 執行下載管理腳本
+                    script_path = os.path.join(BASE_PATH, 'ds_download_manager.py')
+                    # 使用 subprocess 執行並取得輸出結果回報給 Telegram
+                    try:
+                        result = subprocess.check_output([sys.executable, script_path, msg_text], encoding='utf-8')
+                        send_with_keyboard(chat_id, result.strip())
+                    except Exception as e:
+                        send_with_keyboard(chat_id, f"❌ 下載任務調度失敗：{e}")
 
                 # [修改] 處理新的子選單指令
                 elif "查詢氣象" in msg_text:
