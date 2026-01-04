@@ -119,6 +119,11 @@ def handle_updates():
                 chat_id = str(msg["chat"]["id"])
                 msg_text = msg.get("text", "").strip()
 
+                # --- 0. 新增：處理 /start 指令 ---
+                if msg_text == "/start":
+                    send_with_keyboard(chat_id, "👋 歡迎使用 NAS 助理機器人！\n請選擇下方功能按鈕開始操作：")
+                    continue
+
                 # --- 1. 自動解鎖邏輯：若鎖定者執行其他核心指令，則自動解鎖 ---
                 if msg_text in CORE_COMMANDS:
                     is_locked, locker_id, _ = check_system_lock('accounting')
@@ -137,10 +142,7 @@ def handle_updates():
 
                 # --- 3. 核心功能按鈕處理 ---
                 if msg_text == "查股價":
-                    # [修改前] 舊寫法 (容易掉參數)
-                    # os.system(f"python3 {os.path.join(BASE_PATH, 'stock_monitor_nas.py')} manual &")
-
-                    # [修改後] 新寫法 (穩定傳遞 manual 參數，且不阻塞主程式)
+                    # [新寫法] 穩定傳遞 manual 參數，且不阻塞主程式
                     script_path = os.path.join(BASE_PATH, 'stock_monitor_nas.py')
                     subprocess.Popen([sys.executable, script_path, "manual"])
 
@@ -242,7 +244,7 @@ def handle_updates():
                     fix_path = os.path.join(BASE_PATH, 'fix_filenames.py')
                     move_path = os.path.join(BASE_PATH, 'move_files.py')
                     # 使用 && 確保順序，並在最後加上 & 讓整個流程在背景跑
-                    cmd = f"python3 {fix_path} && python3 {move_path} &"
+                    cmd = f"python3 {fix_path} ; python3 {move_path} &"
                     os.system(cmd)
                     send_with_keyboard(chat_id, "🚚 正在依序執行：修正檔名 ➔ 搬移檔案...")
                 elif "清理空間" in msg_text:
