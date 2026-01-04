@@ -17,12 +17,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ================= 🔤 環境初始化 =================
+# 關閉 SSL 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "account_book.db")
 DGPA_URL = "https://www.dgpa.gov.tw/typh/daily/nds.html"
-# 氣象署一般天氣預報 API (以台北市為例，您可於 DB config 調整地區)
+# 氣象署一般天氣預報 API
 CWA_API_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
 
 
@@ -76,22 +77,30 @@ def send_alert(message):
 
 # ================= 🌤️ 氣象預報邏輯 =================
 def monitor_weather_forecast():
-    """每日 20:00 獲取明日高低溫預報"""
-    now_hour = datetime.now().hour
-    if now_hour != 20:
-        logger.info("非 20:00 預報時段，跳過氣溫檢查")
-        return
+    """直接獲取明日高低溫預報 (由排程控制執行時間)"""
 
     api_key = get_config('cwa_api_key')
+    # [修正 1] 從資料庫讀取設定的地區，若未設定則預設為臺北市
+    location = get_config('forecast_location')
+    if not location:
+        location = "臺北市"
+
     if not api_key:
         logger.error("預報中止：資料庫中缺少 cwa_api_key")
         return
 
-    logger.info("正在獲取明日氣溫預報數據...")
+    logger.info(f"正在獲取明日氣溫預報數據 ({location})...")
     try:
-        params = {'Authorization': api_key, 'format': 'JSON', 'locationName': '臺北市'}
-        resp = requests.get(CWA_API_URL, params=params, timeout=20)
+        # [修正 2] 將 locationName 參數改為變數
+        params = {'Authorization': api_key, 'format': 'JSON', 'locationName': location}
+        # 加上 verify=False 跳過 SSL 檢查
+        resp = requests.get(CWA_API_URL, params=params, timeout=20, verify=False)
         data = resp.json()
+
+        # 檢查是否成功取得該地區資料
+        if not data.get('records') or not data['records'].get('location'):
+            logger.error(f"API 回傳錯誤，找不到地區：{location}")
+            return
 
         elements = data['records']['location'][0]['weatherElement']
         # 取得明日白天的預報 (通常在陣列的第二個時段)
@@ -101,7 +110,9 @@ def monitor_weather_forecast():
             if el['elementName'] == 'MinT': min_t = el['time'][1]['parameter']['parameterName']
             if el['elementName'] == 'MaxT': max_t = el['time'][1]['parameter']['parameterName']
 
-        msg = f"🌡️ <b>明日天氣預報 (臺北市)</b>\n━━━━━━━━━━━━━━━━\n最低溫度：{min_t}°C\n最高溫度：{max_t}°C\n\n🕒 預報發佈時間：20:00"
+        current_time = datetime.now().strftime('%H:%M')
+        # [修正 3] 訊息標題連動顯示地區名稱
+        msg = f"🌡️ <b>明日天氣預報 ({location})</b>\n━━━━━━━━━━━━━━━━\n最低溫度：{min_t}°C\n最高溫度：{max_t}°C\n\n🕒 報告時間：{current_time}"
         send_alert(msg)
     except Exception as e:
         logger.error(f"氣象預報抓取失敗: {e}")

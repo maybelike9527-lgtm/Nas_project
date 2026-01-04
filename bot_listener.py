@@ -84,7 +84,8 @@ def send_with_keyboard(chat_id, text, custom_keyboard=None):
         "keyboard": [
             ["查股價", "掃描BT"],
             ["整理檔案", "清理空間"],
-            ["庫存管理", "全部執行"]
+            ["庫存管理", "查港口風力"],  # 新增按鈕
+            ["全部執行", "回主選單"]
         ],
         "resize_keyboard": True
     }
@@ -250,6 +251,10 @@ def handle_updates():
                 elif "清理空間" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
                     send_with_keyboard(chat_id, "🧹 正在執行清理...")
+                elif "查港口風力" in msg_text:
+                    # 執行新的風力監測腳本
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'marine_monitor.py')} &")
+                    send_with_keyboard(chat_id, "⚓ 正在連線氣象署讀取台中港區風力...")
 
         except Exception as e:
             logger.error(f"監聽異常: {e}")
