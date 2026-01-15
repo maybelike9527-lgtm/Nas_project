@@ -9,7 +9,6 @@ import sqlite3
 import logging
 import subprocess
 from datetime import datetime, timedelta
-from geopy.geocoders import Nominatim  # 用於座標逆向轉譯
 
 # ================= 📝 LOGGING 系統設定 (中文化) =================
 logging.basicConfig(
@@ -139,15 +138,16 @@ def handle_updates():
                 if "location" in msg:
                     lat = msg["location"]["latitude"]
                     lon = msg["location"]["longitude"]
+
+                    # 傳送除錯資訊（可選）
+                    debug_msg = f"🔍 <b>[除錯] 轉發座標：</b>\n<code>{lat}, {lon}</code>"
+                    send_with_keyboard(chat_id, debug_msg)
+
                     logger.info(f"收到來自 {chat_id} 的位置：({lat}, {lon})")
 
-                    target_town = reverse_geocoding(lat, lon)
-                    if target_town:
-                        send_with_keyboard(chat_id, f"📍 偵測到位置：<b>{target_town}</b>\n正在為您查詢當地氣象...")
-                        script_path = os.path.join(BASE_PATH, 'disaster_monitor.py')
-                        subprocess.Popen([sys.executable, script_path, target_town])
-                    else:
-                        send_with_keyboard(chat_id, "❌ 無法辨識您的位置行政區。")
+                    # 直接呼叫腳本，傳入座標字串格式 "lat,lon"
+                    script_path = os.path.join(BASE_PATH, 'disaster_monitor.py')
+                    subprocess.Popen([sys.executable, script_path, f"{lat},{lon}"])
                     continue
 
                 if "text" not in msg: continue
