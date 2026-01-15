@@ -9,6 +9,7 @@ import sqlite3
 import logging
 import subprocess
 from datetime import datetime, timedelta
+from geopy.geocoders import Nominatim  # 用於座標逆向轉譯
 
 # ================= 📝 LOGGING 系統設定 (中文化) =================
 logging.basicConfig(
@@ -74,13 +75,29 @@ def set_system_lock(lock_name, user_id, lock_status):
         logger.error(f"更新鎖定失敗: {e}")
 
 
+# ================= 📍 地理位置轉譯工具 =================
+def reverse_geocoding(lat, lon):
+    """將經緯度座標轉為台灣行政區名稱 (例如：神岡區)"""
+    try:
+        geolocator = Nominatim(user_agent="nas_weather_bot")
+        location = geolocator.reverse(f"{lat}, {lon}", language='zh-TW')
+        address = location.raw.get('address', {})
+
+        # 優先抓取行政區 (suburb/town/city_district)
+        township = address.get('suburb') or address.get('town') or address.get('city_district') or address.get(
+            'village')
+        return township
+    except Exception as e:
+        logger.error(f"座標轉譯失敗: {e}")
+        return None
+
+
 # ================= 🤖 Telegram 發送邏輯 =================
 TOKEN = get_config('tele_token')
 
 
 def send_with_keyboard(chat_id, text, custom_keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    # [修改] 主選單將「查港口風力」改為「氣象查詢」
     default_keyboard = {
         "keyboard": [
             ["查股價", "掃描BT"],
@@ -99,8 +116,6 @@ def send_with_keyboard(chat_id, text, custom_keyboard=None):
 def handle_updates():
     offset = None
     user_state = {}
-
-    # 定義核心功能指令清單 (加入新指令以支援自動解鎖)
     CORE_COMMANDS = ["查股價", "掃描BT", "整理檔案", "清理空間", "全部執行", "氣象查詢", "查詢氣象", "港口風力"]
 
     logger.info("機器人監聽服務已啟動")
@@ -115,62 +130,66 @@ def handle_updates():
 
             for update in response["result"]:
                 offset = update["update_id"] + 1
-                if "message" not in update or "text" not in update["message"]: continue
+                if "message" not in update: continue
 
                 msg = update["message"]
                 chat_id = str(msg["chat"]["id"])
-                msg_text = msg.get("text", "").strip()
 
-                # --- 0. 處理 /start 指令 ---
-                if msg_text == "/start":
-                    send_with_keyboard(chat_id, "👋 歡迎使用 NAS 助理機器人！\n請選擇下方功能按鈕開始操作：")
+                # --- 0. 處理發送位置訊息 (隨身氣象台) ---
+                if "location" in msg:
+                    lat = msg["location"]["latitude"]
+                    lon = msg["location"]["longitude"]
+                    logger.info(f"收到來自 {chat_id} 的位置：({lat}, {lon})")
+
+                    target_town = reverse_geocoding(lat, lon)
+                    if target_town:
+                        send_with_keyboard(chat_id, f"📍 偵測到位置：<b>{target_town}</b>\n正在為您查詢當地氣象...")
+                        script_path = os.path.join(BASE_PATH, 'disaster_monitor.py')
+                        subprocess.Popen([sys.executable, script_path, target_town])
+                    else:
+                        send_with_keyboard(chat_id, "❌ 無法辨識您的位置行政區。")
                     continue
 
-                # --- 1. 自動解鎖邏輯 ---
+                if "text" not in msg: continue
+                msg_text = msg.get("text", "").strip()
+
+                # --- 1. 自動解鎖與基礎指令 ---
+                if msg_text == "/start":
+                    send_with_keyboard(chat_id, "👋 歡迎使用 NAS 助理機器人！\n請選擇功能或直接「傳送位置」查詢氣象：")
+                    continue
+
                 if msg_text in CORE_COMMANDS:
                     is_locked, locker_id, _ = check_system_lock('accounting')
                     if is_locked == 1 and str(locker_id) == chat_id:
-                        logger.info(f"使用者 {chat_id} 執行 {msg_text}，系統自動解除記帳鎖定")
                         set_system_lock('accounting', None, 0)
                         user_state.pop(chat_id, None)
 
-                # --- 2. 處理「返回/取消」指令 ---
                 if msg_text in ["回主選單", "取消"]:
                     set_system_lock('accounting', None, 0)
                     user_state.pop(chat_id, None)
-                    send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
+                    send_with_keyboard(chat_id, "🏠 已回到主選單。")
                     continue
 
-                # --- 3. [新增] 氣象查詢層級選單 ---
+                # --- 2. 氣象查詢選單 ---
                 if msg_text == "氣象查詢":
                     weather_kb = {
-                        "keyboard": [
-                            ["查詢氣象", "港口風力"],
-                            ["回主選單"]
-                        ],
+                        "keyboard": [["查詢氣象", "港口風力"], ["回主選單"]],
                         "resize_keyboard": True
                     }
-                    send_with_keyboard(chat_id, "🌤️ <b>氣象與風力查詢</b>\n請選擇您要查詢的項目：", weather_kb)
+                    send_with_keyboard(chat_id, "🌤️ <b>氣象查詢</b>\n您可以點擊按鈕或直接「傳送位置」給機器人。",
+                                       weather_kb)
                     continue
 
-                # --- 4. 核心功能按鈕處理 ---
-                if msg_text == "查股價":
-                    script_path = os.path.join(BASE_PATH, 'stock_monitor_nas.py')
-                    subprocess.Popen([sys.executable, script_path, "manual"])
-                    send_with_keyboard(chat_id, "📈 收到指令：正在抓取最新行情回報...")
-                    continue
-
+                # --- 3. 庫存管理狀態處理 ---
                 if msg_text == "庫存管理":
                     is_locked, locker_id, _ = check_system_lock('accounting')
                     if is_locked == 1 and str(locker_id) != chat_id:
-                        logger.info(f"使用者 {chat_id} 嘗試進入，但目前由 {locker_id} 使用中")
-                        send_with_keyboard(chat_id, "⚠️ <b>有人正在管理中請稍等</b>\n請待前一位使用者完成後再試。")
+                        send_with_keyboard(chat_id, "⚠️ <b>有人正在管理中請稍等</b>")
                         continue
-
                     set_system_lock('accounting', chat_id, 1)
                     manage_kb = {"keyboard": [["新增庫存", "刪除庫存"], ["查看庫存", "回主選單"]],
                                  "resize_keyboard": True}
-                    send_with_keyboard(chat_id, "📊 <b>庫存與成本管理</b>\n請選擇操作：", manage_kb)
+                    send_with_keyboard(chat_id, "📊 <b>庫存管理模式</b>", manage_kb)
                     continue
 
                 if msg_text == "查看庫存":
@@ -189,26 +208,22 @@ def handle_updates():
                                 report += f"\n代號：<code>{code}</code>\n持股：{shares} | 成本：{cost}\n"
                             send_with_keyboard(chat_id, report)
                     except Exception as e:
-                        logger.error(f"查看庫存失敗: {e}")
                         send_with_keyboard(chat_id, "❌ 讀取資料庫失敗。")
                     continue
 
                 if msg_text == "新增庫存":
-                    send_with_keyboard(chat_id,
-                                       "📝 請輸入：<code>代號 股數 成本</code>\n例如：<code>2330 1000 650.5</code>",
-                                       {"keyboard": [["回主選單"]]})
+                    send_with_keyboard(chat_id, "📝 請輸入：<code>代號 股數 成本</code>", {"keyboard": [["回主選單"]]})
                     user_state[chat_id] = "WAIT_STOCK_ADD"
                     continue
 
                 if msg_text == "刪除庫存":
-                    send_with_keyboard(chat_id, "🗑️ 請輸入要刪除的<b>股票代號</b>：", {"keyboard": [["回主選單"]]})
+                    send_with_keyboard(chat_id, "🗑️ 請輸入要刪除的股票代號：", {"keyboard": [["回主選單"]]})
                     user_state[chat_id] = "WAIT_STOCK_DEL"
                     continue
 
-                # --- 5. 處理狀態 (State) 輸入邏輯 ---
+                # 處理輸入狀態
                 if chat_id in user_state:
                     state = user_state[chat_id]
-
                     if state == "WAIT_STOCK_ADD":
                         try:
                             parts = msg_text.split()
@@ -220,12 +235,10 @@ def handle_updates():
                                 (chat_id, code, int(shares), float(cost)))
                             conn.commit()
                             conn.close()
-                            logger.info(f"使用者 {chat_id} 更新庫存: {code}")
-                            send_with_keyboard(chat_id, f"✅ 已紀錄 <b>{code}</b>\n股數：{shares}\n成本：{cost}")
+                            send_with_keyboard(chat_id, f"✅ 已紀錄 {code}\n股數：{shares}\n成本：{cost}")
                             user_state.pop(chat_id)
                         except:
                             send_with_keyboard(chat_id, "❌ 格式錯誤，請重新輸入：\n<code>代號 股數 成本</code>")
-
                     elif state == "WAIT_STOCK_DEL":
                         try:
                             conn = sqlite3.connect(DB_PATH)
@@ -234,49 +247,44 @@ def handle_updates():
                                            (chat_id, msg_text))
                             if cursor.rowcount > 0:
                                 conn.commit()
-                                logger.info(f"使用者 {chat_id} 刪除庫存: {msg_text}")
-                                send_with_keyboard(chat_id, f"✅ 已成功刪除 <b>{msg_text}</b>")
+                                send_with_keyboard(chat_id, f"✅ 已成功刪除 {msg_text}")
                                 user_state.pop(chat_id)
                             else:
-                                send_with_keyboard(chat_id, f"❓ 找不到代號 <b>{msg_text}</b> 的資料。")
+                                send_with_keyboard(chat_id, f"❓ 找不到代號 {msg_text}")
                             conn.close()
-                        except Exception as e:
-                            logger.error(f"刪除失敗: {e}")
+                        except:
                             send_with_keyboard(chat_id, "❌ 執行刪除時發生錯誤。")
                     continue
 
-                # --- 6. 其他 NAS 功能指令 ---
-                if "掃描BT" in msg_text:
+                # --- 4. 核心功能執行 ---
+                if msg_text == "查股價":
+                    script_path = os.path.join(BASE_PATH, 'stock_monitor_nas.py')
+                    subprocess.Popen([sys.executable, script_path, "manual"])
+                    send_with_keyboard(chat_id, "📈 正在抓取最新行情...")
+                elif "查詢氣象" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'disaster_monitor.py')} &")
+                    send_with_keyboard(chat_id, "🌤️ 正在獲取預設地區氣象...")
+                elif "港口風力" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'marine_monitor.py')} &")
+                    send_with_keyboard(chat_id, "⚓ 正在連線讀取台中港風力...")
+                elif "掃描BT" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'check_bt.py')} &")
                     send_with_keyboard(chat_id, "🔍 正在掃描大檔案...")
                 elif "整理檔案" in msg_text:
-                    fix_path = os.path.join(BASE_PATH, 'fix_filenames.py')
-                    move_path = os.path.join(BASE_PATH, 'move_files.py')
-                    cmd = f"python3 {fix_path} ; python3 {move_path} &"
+                    cmd = f"python3 {os.path.join(BASE_PATH, 'fix_filenames.py')} ; python3 {os.path.join(BASE_PATH, 'move_files.py')} &"
                     os.system(cmd)
-                    send_with_keyboard(chat_id, "🚚 正在依序執行：修正檔名 ➔ 搬移檔案...")
+                    send_with_keyboard(chat_id, "🚚 正在執行整理與搬移...")
                 elif "清理空間" in msg_text:
                     os.system(f"python3 {os.path.join(BASE_PATH, 'clean_bt_nas.py')} &")
-                    send_with_keyboard(chat_id, "🧹 正在執行清理...")
+                    send_with_keyboard(chat_id, "🧹 正在清理小於 100MB 檔案...")
                 elif msg_text.startswith("https://cn.javd.me/movie/"):
-                    send_with_keyboard(chat_id, "🔍 偵測到 JAVD 連結，正在解析並加入下載任務...")
-
-                    # 執行下載管理腳本
+                    send_with_keyboard(chat_id, "🔍 正在解析並加入下載任務...")
                     script_path = os.path.join(BASE_PATH, 'ds_download_manager.py')
-                    # 使用 subprocess 執行並取得輸出結果回報給 Telegram
                     try:
                         result = subprocess.check_output([sys.executable, script_path, msg_text], encoding='utf-8')
                         send_with_keyboard(chat_id, result.strip())
-                    except Exception as e:
-                        send_with_keyboard(chat_id, f"❌ 下載任務調度失敗：{e}")
-
-                # [修改] 處理新的子選單指令
-                elif "查詢氣象" in msg_text:
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'disaster_monitor.py')} &")
-                    send_with_keyboard(chat_id, "🌤️ 正在獲取最新氣象預報...")
-                elif "港口風力" in msg_text:
-                    os.system(f"python3 {os.path.join(BASE_PATH, 'marine_monitor.py')} &")
-                    send_with_keyboard(chat_id, "⚓ 正在連線氣象署讀取台中港區風力...")
+                    except:
+                        send_with_keyboard(chat_id, "❌ 下載任務調度失敗")
 
         except Exception as e:
             logger.error(f"監聽異常: {e}")
