@@ -10,7 +10,7 @@ import logging
 import subprocess
 from datetime import datetime, timedelta
 
-# ================= 📝 LOGGING 系統設定 (中文化) =================
+# ================= 📝 LOGGING 系統設定 =================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -26,7 +26,6 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "account_book
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-# ================= 📦 資料庫與鎖定工具 =================
 def get_config(key):
     try:
         conn = sqlite3.connect(DB_PATH, timeout=20)
@@ -41,7 +40,6 @@ def get_config(key):
 
 
 def check_system_lock(lock_name):
-    """檢查併發鎖定 (含 5 分鐘逾時自動解鎖)"""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=10)
         cursor = conn.cursor()
@@ -51,13 +49,11 @@ def check_system_lock(lock_name):
         if result and result[0] == 1:
             lock_time = datetime.strptime(result[2], '%Y-%m-%d %H:%M:%S')
             if datetime.now() - lock_time > timedelta(minutes=5):
-                logger.warning(f"偵測到鎖定逾時 ({lock_name})，執行自動解鎖")
                 set_system_lock(lock_name, None, 0)
                 return (0, None, None)
             return result
         return (0, None, None)
-    except Exception as e:
-        logger.error(f"檢查鎖定狀態失敗: {e}")
+    except Exception:
         return (0, None, None)
 
 
@@ -69,24 +65,18 @@ def set_system_lock(lock_name, user_id, lock_status):
                      (lock_status, user_id, lock_time, lock_name))
         conn.commit()
         conn.close()
-        logger.info(f"鎖定更新成功: {lock_name}={lock_status} (使用者={user_id})")
     except Exception as e:
         logger.error(f"更新鎖定失敗: {e}")
 
 
-# ================= 🤖 Telegram 發送邏輯 =================
 TOKEN = get_config('tele_token')
 
 
 def send_with_keyboard(chat_id, text, custom_keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     default_keyboard = {
-        "keyboard": [
-            ["查股價", "掃描BT"],
-            ["整理檔案", "清理空間"],
-            ["庫存管理", "氣象查詢"],
-            ["全部執行", "回主選單"]
-        ],
+        "keyboard": [["查股價", "掃描BT"], ["整理檔案", "清理空間"], ["庫存管理", "氣象查詢"],
+                     ["全部執行", "回主選單"]],
         "resize_keyboard": True
     }
     keyboard = custom_keyboard if custom_keyboard else default_keyboard
@@ -94,7 +84,6 @@ def send_with_keyboard(chat_id, text, custom_keyboard=None):
     requests.post(url, data=data, verify=False, timeout=10)
 
 
-# ================= 🔄 訊息監聽循環 =================
 def handle_updates():
     offset = None
     user_state = {}
@@ -112,62 +101,51 @@ def handle_updates():
 
             for update in response["result"]:
                 offset = update["update_id"] + 1
-
-                # 僅處理包含文字訊息的 update
-                if "message" not in update or "text" not in update["message"]:
-                    continue
-
+                if "message" not in update: continue
                 msg = update["message"]
                 chat_id = str(msg["chat"]["id"])
-                msg_text = msg.get("text", "").strip()
 
-                # --- 1. 處理 /start 指令 ---
-                if msg_text == "/start":
-                    send_with_keyboard(chat_id, "👋 歡迎使用 NAS 助理機器人！\n請選擇下方功能按鈕開始操作：")
-                    continue
-
-                # --- 2. 自動解鎖與返回邏輯 ---
-                if msg_text in CORE_COMMANDS:
-                    is_locked, locker_id, _ = check_system_lock('accounting')
-                    if is_locked == 1 and str(locker_id) == chat_id:
-                        set_system_lock('accounting', None, 0)
-                        user_state.pop(chat_id, None)
-
-                if msg_text in ["回主選單", "取消"]:
-                    set_system_lock('accounting', None, 0)
-                    user_state.pop(chat_id, None)
-                    send_with_keyboard(chat_id, "🏠 已解除鎖定，回到主選單。")
-                    continue
-
-                # --- 3. 氣象查詢選單 ---
-                if msg_text == "氣象查詢":
-                    # 從資料庫獲取預設地區作為模擬座標（或讀取預設經緯度設定）
-                    default_location = get_config('forecast_location') or "臺中市"
-
-                    # 製作座標 JSON 資料結構
-                    # 註：這裡模擬 Telegram 的 location 格式存檔
+                # --- 🟢 核心修正：動態抓取傳入的位置並製作 JSON 存檔 ---
+                if "location" in msg:
                     location_data = {
                         "location": {
-                            "latitude": 24.26,  # 預設緯度 (範例)
-                            "longitude": 120.66,  # 預設經度 (範例)
-                            "address_name": default_location
+                            "latitude": msg["location"]["latitude"],
+                            "longitude": msg["location"]["longitude"]
                         },
                         "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }
-
-                    # 將座標存入 JSON 檔案
                     json_file_path = os.path.join(BASE_PATH, 'current_location.json')
                     with open(json_file_path, 'w', encoding='utf-8') as f:
                         json.dump(location_data, f, ensure_ascii=False, indent=4)
 
-                    logger.info(f"已製作座標 JSON 存檔：{json_file_path}")
+                    logger.info(f"✅ 已抓取即時位置並存檔：{json_file_path}")
+                    send_with_keyboard(chat_id,
+                                       "📍 <b>位置存檔已更新</b>\n座標已成功存入系統，現在點選「查詢氣象」即可獲得當地預報。")
+                    continue
 
+                if "text" not in msg: continue
+                msg_text = msg.get("text", "").strip()
+
+                if msg_text == "/start":
+                    send_with_keyboard(chat_id, "👋 歡迎！\n請點擊「氣象查詢」來傳送位置或查詢預報。")
+                    continue
+
+                if msg_text == "氣象查詢":
                     weather_kb = {
-                        "keyboard": [["查詢氣象", "港口風力"], ["回主選單"]],
+                        "keyboard": [
+                            [{"text": "📍 發送當前位置", "request_location": True}],
+                            ["查詢氣象", "港口風力"],
+                            ["回主選單"]
+                        ],
                         "resize_keyboard": True
                     }
-                    send_with_keyboard(chat_id, "🌤️ <b>氣象查詢</b>\n已為您更新當前位置存檔，請選擇查詢項目：",
+                    send_with_keyboard(chat_id, "🌤️ <b>氣象查詢選單</b>\n請點擊按鈕更新座標，或直接點選預報項目：",
                                        weather_kb)
+                    continue
+
+                elif "查詢氣象" in msg_text:
+                    os.system(f"python3 {os.path.join(BASE_PATH, 'disaster_monitor.py')} &")
+                    send_with_keyboard(chat_id, "🌤️ 正在根據存檔位置獲取預報...")
                     continue
 
                 # --- 4. 核心功能按鈕處理 ---
