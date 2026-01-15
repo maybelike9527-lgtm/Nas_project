@@ -141,11 +141,33 @@ def handle_updates():
 
                 # --- 3. 氣象查詢選單 ---
                 if msg_text == "氣象查詢":
+                    # 從資料庫獲取預設地區作為模擬座標（或讀取預設經緯度設定）
+                    default_location = get_config('forecast_location') or "臺中市"
+
+                    # 製作座標 JSON 資料結構
+                    # 註：這裡模擬 Telegram 的 location 格式存檔
+                    location_data = {
+                        "location": {
+                            "latitude": 24.26,  # 預設緯度 (範例)
+                            "longitude": 120.66,  # 預設經度 (範例)
+                            "address_name": default_location
+                        },
+                        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+
+                    # 將座標存入 JSON 檔案
+                    json_file_path = os.path.join(BASE_PATH, 'current_location.json')
+                    with open(json_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(location_data, f, ensure_ascii=False, indent=4)
+
+                    logger.info(f"已製作座標 JSON 存檔：{json_file_path}")
+
                     weather_kb = {
                         "keyboard": [["查詢氣象", "港口風力"], ["回主選單"]],
                         "resize_keyboard": True
                     }
-                    send_with_keyboard(chat_id, "🌤️ <b>氣象與風力查詢</b>\n請選擇您要查詢的項目：", weather_kb)
+                    send_with_keyboard(chat_id, "🌤️ <b>氣象查詢</b>\n已為您更新當前位置存檔，請選擇查詢項目：",
+                                       weather_kb)
                     continue
 
                 # --- 4. 核心功能按鈕處理 ---
