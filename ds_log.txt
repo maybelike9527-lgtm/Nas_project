@@ -1,0 +1,5 @@
+2026-01-05 10:03:10,475 - INFO - 程式啟動 - 初始化設定 (輕量版)
+2026-01-05 10:03:10,479 - INFO - ✅ 已讀取 Gemini API Key
+2026-01-05 10:03:10,479 - INFO - >>> 開始執行檢測流程 <<<
+2026-01-05 10:03:10,482 - DEBUG - Starting new HTTP connection (1): 192.168.50.191:5000
+2026-01-05 10:03:25,511 - ERROR - ❌ 連線錯誤 (Login): HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=15)

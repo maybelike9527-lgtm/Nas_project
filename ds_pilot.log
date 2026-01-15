@@ -1,0 +1,143 @@
+2026-01-05 10:55:05,925 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 10:55:28,494 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 10:55:28,589 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 10:57:01,608 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 10:57:05,680 - ERROR - 連線錯誤: HTTPConnectionPool(host='localhost', port=80): Max retries exceeded with url: /webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=holiness&passwd=Sonygood7576&session=DownloadStation&format=cookie (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001406C7DF380>: Failed to establish a new connection: [WinError 10061] 無法連線，因為目標電腦拒絕連線。'))
+2026-01-05 10:57:11,943 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 10:57:16,036 - ERROR - 連線錯誤: HTTPConnectionPool(host='localhost', port=80): Max retries exceeded with url: /webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=holiness&passwd=Sonygood7576&session=DownloadStation&format=cookie (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x00000217E8E4F380>: Failed to establish a new connection: [WinError 10061] 無法連線，因為目標電腦拒絕連線。'))
+2026-01-05 10:57:37,528 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 10:58:03,142 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 10:58:03,228 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 11:03:13,610 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 11:03:28,633 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 11:03:28,785 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 11:06:52,414 - INFO - >>> AI Pilot 啟動 <<<
+2026-01-05 11:07:18,524 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 11:07:18,633 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 11:13:16,232 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 版) <<<
+2026-01-05 11:13:46,247 - ERROR - 連線錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:13:53,756 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 版) <<<
+2026-01-05 11:14:23,782 - ERROR - 連線錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:14:29,107 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 版) <<<
+2026-01-05 11:14:44,821 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 11:14:44,940 - ERROR - Gemini API 錯誤 (代碼 429): {
+  "error": {
+    "code": 429,
+    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\nPlease retry in 14.889901114s.",
+    "status": "RESOURCE_EXHAUSTED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.Help",
+        "links": [
+          {
+            "description": "Learn more about Gemini API quotas",
+            "url": "https://ai.google.dev/gemini-api/docs/rate-limits"
+          }
+        ]
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+        "violations": [
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+            "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+            "quotaDimensions": {
+              "location": "global",
+              "model": "gemini-2.0-flash"
+            }
+          },
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+            "quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",
+            "quotaDimensions": {
+              "location": "global",
+              "model": "gemini-2.0-flash"
+            }
+          },
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_input_token_count",
+            "quotaId": "GenerateContentInputTokensPerModelPerMinute-FreeTier",
+            "quotaDimensions": {
+              "model": "gemini-2.0-flash",
+              "location": "global"
+            }
+          }
+        ]
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.RetryInfo",
+        "retryDelay": "14s"
+      }
+    ]
+  }
+}
+
+2026-01-05 11:14:44,940 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 11:16:27,557 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 + 抗壓版) <<<
+2026-01-05 11:16:57,588 - ERROR - 連線錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:17:19,565 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 + 抗壓版) <<<
+2026-01-05 11:17:49,593 - ERROR - 連線錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:17:55,405 - INFO - >>> AI Pilot 啟動 (Gemini 2.0 + 抗壓版) <<<
+2026-01-05 11:18:19,494 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 11:18:19,596 - WARNING - ⏳ Gemini 忙碌中 (429 Rate Limit)，將於 20 秒後重試...
+2026-01-05 11:18:39,597 - INFO - 🔄 正在重試連線 AI... (第 2 次)
+2026-01-05 11:18:39,681 - WARNING - ⏳ Gemini 忙碌中 (429 Rate Limit)，將於 20 秒後重試...
+2026-01-05 11:18:59,682 - INFO - 🔄 正在重試連線 AI... (第 3 次)
+2026-01-05 11:18:59,765 - WARNING - ⏳ Gemini 忙碌中 (429 Rate Limit)，將於 20 秒後重試...
+2026-01-05 11:19:19,767 - ERROR - ❌ 重試 3 次後仍然失敗，放棄本次請求。
+2026-01-05 11:19:19,767 - WARNING - ❌ 無法取得 AI 決策。
+2026-01-05 11:20:41,328 - INFO - >>> AI Pilot 啟動 (Gemini Flash Stable 版) <<<
+2026-01-05 11:21:11,358 - ERROR - 連線錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:21:28,558 - INFO - >>> AI Pilot 啟動 (Gemini Flash Stable 版) <<<
+2026-01-05 11:21:56,284 - INFO - 🔍 掃描到 22 個任務，請示 Gemini 中...
+2026-01-05 11:22:07,493 - INFO - 🤖 收到 Gemini 指令，開始安全審查...
+2026-01-05 11:22:07,493 - INFO - 維持: mida-106 (正常大檔案 (6580.8MB))
+2026-01-05 11:22:07,493 - INFO - 維持: DASS-732 (正常大檔案 (5239.1MB))
+2026-01-05 11:22:07,493 - INFO - 維持: mikr-024 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:07,493 - INFO - 維持: ofes-021 (正常大檔案 (10365.0MB))
+2026-01-05 11:22:07,493 - INFO - 維持: 348NTR-067-UC (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:07,493 - INFO - 維持: MISM-403 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,514 - ERROR - 執行 API 錯誤: HTTPConnectionPool(host='192.168.50.191', port=5000): Read timed out. (read timeout=30)
+2026-01-05 11:22:37,515 - INFO - 維持: MIZD-473 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-094.mp4 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-101 (正常大檔案 (4501.7MB))
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-103 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-102 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-082 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-075.mp4 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-068 若宮穂乃.mp4 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:37,515 - INFO - 維持: 390JNT-067 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:56,393 - INFO - ✨ 執行成功 [DELETE]: ID dbid_1016 - 檔案過小 (0MB)，且為帶有廣告網站標記的Torrent文件
+2026-01-05 11:22:59,430 - INFO - ✨ 執行成功 [DELETE]: ID dbid_1019 - 檔案過小 (0MB)，且帶有廣告網站標記，疑似無效任務殘留
+2026-01-05 11:22:59,430 - INFO - 維持: 476MLA-254 (檔案大小未知 (0MB)，先保留)
+2026-01-05 11:22:59,430 - INFO - 維持: MIDA-208-C (正常大檔案 (6416.0MB))
+2026-01-05 11:22:59,430 - INFO - 維持: [javd.me]WAAA-530-C.torrent (正常大檔案 (5226.5MB)，優先保護大檔案)
+2026-01-05 11:22:59,430 - INFO - 維持: JUR-531-UC (正常大檔案 (6567.0MB))
+2026-01-05 11:22:59,430 - INFO - ✅ 流程結束。
+2026-01-05 11:27:33,147 - INFO - >>> AI 調度員啟動 (流量管制模式) <<<
+2026-01-05 11:28:22,356 - INFO - 🤖 AI 決策執行中...
+2026-01-05 11:28:55,938 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (886.0小時) 已遠超3小時限制。
+2026-01-05 11:28:56,604 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.1小時) 已遠超3小時限制。
+2026-01-05 11:28:58,920 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.1小時) 已遠超3小時限制。
+2026-01-05 11:28:59,820 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.0小時) 已遠超3小時限制。
+2026-01-05 11:29:00,764 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.0小時) 已遠超3小時限制。
+2026-01-05 11:29:01,785 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.0小時) 已遠超3小時限制。
+2026-01-05 11:29:02,309 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.0小時) 已遠超3小時限制。
+2026-01-05 11:29:02,643 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (189.0小時) 已遠超3小時限制。
+2026-01-05 11:29:03,242 - INFO - ✨ 執行 [DELETE]: 死種：檔案大小0MB，且存在時間 (143.1小時) 已遠超3小時限制。
+2026-01-05 11:29:05,466 - INFO - ✨ 執行 [RESUME]: 優先級1：進度高達71.7%，應優先完成以釋放資源。
+2026-01-05 11:29:05,708 - INFO - ✨ 執行 [RESUME]: 優先級2：進度已達23.6%，且任務很新 (1.3小時)，潛力高。
+2026-01-05 11:29:05,931 - INFO - ✨ 執行 [RESUME]: 優先級3：最新加入的任務 (1.3小時)，給予啟動機會，測試種源狀況。
+2026-01-05 11:29:05,932 - INFO - 維持暫停: [javd.me]WAAA-530-C.torrent
+2026-01-05 11:29:05,932 - INFO - 維持暫停: ofes-021
+2026-01-05 11:29:05,932 - INFO - 維持暫停: DASS-732
+2026-01-05 11:29:05,932 - INFO - 維持暫停: 390JNT-101
+2026-01-05 11:29:05,932 - INFO - ✅ 調度完成。
+2026-01-05 11:31:37,320 - INFO - >>> AI 調度員啟動 (流量管制模式) <<<
+2026-01-05 11:32:26,531 - INFO - 🤖 AI 決策執行中...
+2026-01-05 11:32:36,568 - INFO - AI 建議維持: mida-106
+2026-01-05 11:32:38,204 - INFO - ✨ 執行 [RESUME]: 高優先級任務 (23.6%進度)，填補下載限額
+2026-01-05 11:32:38,424 - INFO - ✨ 執行 [RESUME]: 高優先級任務 (19.0%進度)，填補下載限額
+2026-01-05 11:32:42,420 - INFO - ✨ 執行 [PAUSE]: 資源禮讓：進度 0%，等待資源釋放
+2026-01-05 11:32:59,287 - INFO - ✨ 執行 [PAUSE]: 資源禮讓：進度 0%，等待資源釋放
+2026-01-05 11:32:59,287 - INFO - ✅ 調度完成。
