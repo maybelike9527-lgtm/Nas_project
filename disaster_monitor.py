@@ -24,6 +24,7 @@ CWA_API_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
 
 
 def get_config(key):
+    """從資料庫讀取設定值"""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=20)
         cursor = conn.cursor()
@@ -37,32 +38,41 @@ def get_config(key):
 
 
 def send_alert(message):
+    """透過 Telegram Bot 發送警報訊息"""
     token = get_config('tele_token')
     chat_id = get_config('tele_chat_id')
-    if not token or not chat_id: return
+    if not token or not chat_id:
+        return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'}
-    requests.post(url, data=payload, timeout=15, verify=False)
+    try:
+        requests.post(url, data=payload, timeout=15, verify=False)
+    except Exception as e:
+        logger.error(f"Telegram 發送異常: {e}")
 
 
-# ================= 🌤️ 氣象預報邏輯 (修正版) =================
-def monitor_weather_forecast():
+# ================= 🌤️ 氣象預報核心邏輯 =================
+def monitor_weather_forecast(override_location=None):
+    """獲取氣象預報資訊 (支援時段判斷與外部參數傳入)"""
     api_key = get_config('cwa_api_key')
-    location = get_config('forecast_location') or "臺中市"
+    # 優先序：外部參數 > 資料庫設定 > 預設值
+    location = override_location or get_config('forecast_location') or "臺中市"
 
     if not api_key:
         logger.error("缺少 API Key")
         return
 
-    # 判斷查詢時段：20:00 後查明天，其餘查今天
+    # 1. 判斷查詢時段：20:00 後查明天 (API 索引值 1)，其餘查今天 (索引值 0)
     now = datetime.now()
     if now.hour >= 20:
         target_label = "明日"
-        time_index = 1  # 氣象署 API 第二個時段通常為明天白天
+        time_index = 1
     else:
         target_label = "今日"
-        time_index = 0  # 第一個時段為當前/今日
+        time_index = 0
+
+    logger.info(f"正在獲取 {target_label} 氣溫預報數據 ({location})...")
 
     try:
         params = {'Authorization': api_key, 'format': 'JSON', 'locationName': location}
@@ -71,23 +81,28 @@ def monitor_weather_forecast():
 
         if not data.get('records') or not data['records'].get('location'):
             logger.error(f"找不到地區資料：{location}")
+            # 若為外部查詢失敗，回報給使用者
+            if override_location:
+                send_alert(f"❌ 找不到地區「{location}」的預報資料。")
             return
 
         elements = data['records']['location'][0]['weatherElement']
 
+        # 初始化氣象資料字典
         weather_info = {
-            'Wx': '',  # 天氣現象
+            'Wx': '',   # 天氣現象
             'PoP': '',  # 降雨機率
-            'MinT': '',  # 最低溫
+            'MinT': '', # 最低溫
             'MaxT': ''  # 最高溫
         }
 
+        # 遍歷氣象要素並提取對應時段資料
         for el in elements:
             e_name = el['elementName']
             if e_name in weather_info:
-                # 取得對應時段的資料
                 weather_info[e_name] = el['time'][time_index]['parameter']['parameterName']
 
+        # 2. 組合 Telegram 訊息格式
         msg = f"🌤️ <b>{target_label}天氣預報 ({location})</b>\n"
         msg += f"━━━━━━━━━━━━━━━━\n"
         msg += f"📝 天氣狀況：<b>{weather_info['Wx']}</b>\n"
@@ -103,4 +118,10 @@ def monitor_weather_forecast():
 
 
 if __name__ == "__main__":
-    monitor_weather_forecast()
+    # 3. 處理外部參數傳入 (支援 bot_listener 呼叫隨身氣象台)
+    if len(sys.argv) > 1:
+        # sys.argv[1] 為 bot_listener 傳來的行政區名稱
+        monitor_weather_forecast(sys.argv[1])
+    else:
+        # 預設執行 (讀取資料庫設定)
+        monitor_weather_forecast()
